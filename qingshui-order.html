@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>清水叫貨表轉換（獨立版）</title>
+<style>
+  :root{
+    --bg:#f3f5f0; --card:#fff; --ink:#1c2a1e; --sub:#6b7a6d; --line:#dfe5da;
+    --green:#2f7d3b; --green-d:#22602c; --hit:#e6f4e2; --warn:#b4560a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+    font-size:16px;line-height:1.4;padding-bottom:96px}
+  header{background:var(--green);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:19px;letter-spacing:.04em}
+  header .row{display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  header input{border:0;border-radius:8px;padding:7px 10px;font:inherit;width:150px}
+  header .count{margin-left:auto;font-size:14px;opacity:.95}
+  main{max-width:860px;margin:0 auto;padding:12px}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);
+    border-radius:10px;padding:9px 14px;cursor:pointer}
+  button.primary{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+  button.primary:active{background:var(--green-d)}
+  button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  @media (max-width:420px){.grid{gap:4px} main{padding:8px}}
+  .item{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);
+    border-radius:10px;padding:6px 8px;min-width:0}
+  .item.has{background:var(--hit);border-color:#9fcf96}
+  .item .name{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .name.flag{color:var(--warn)}
+  .item input.qty{width:58px;text-align:right;font:inherit;font-weight:700;font-size:18px;
+    border:1px solid var(--line);border-radius:8px;padding:6px 6px;background:#fff}
+  .item .unit{width:1.3em;color:var(--sub);text-align:center;flex:none}
+  .item input.ename{flex:1;min-width:0;font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px}
+  .item input.eunit{width:44px;font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center}
+  .item .del{padding:4px 8px;border-radius:8px;color:#a22}
+  h2{font-size:15px;color:var(--sub);margin:18px 0 6px}
+  textarea{width:100%;min-height:220px;font:inherit;font-size:17px;border:1px solid var(--line);
+    border-radius:12px;padding:12px;background:#fff;resize:vertical}
+  .opts{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--sub);margin:6px 0}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+    padding:10px 12px;display:flex;gap:8px;justify-content:center;z-index:6}
+  .bar button{flex:1;max-width:260px;padding:13px}
+  .toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:#fff;
+    padding:9px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+  .toast.show{opacity:1}
+  .note{font-size:13px;color:var(--sub);margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>清水叫貨表 → LINE 文字</h1>
+  <div class="row">
+    <input id="date" type="date" aria-label="日期">
+    <span class="count" id="count"></span>
+  </div>
+</header>
+
+<main>
+  <div class="tools">
+    <button class="primary" id="btnPhoto">📷 圖片轉數量</button>
+    <input type="file" id="file" accept="image/*" hidden>
+    <button id="btnClear">全部清空</button>
+    <button id="btnEdit">編輯品項</button>
+    <button id="btnAdd" hidden>＋ 新增品項</button>
+    <button id="btnReset" hidden>還原預設品項</button>
+    <button id="btnSet">⚙ 辨識設定</button>
+  </div>
+
+  <div id="setPanel" hidden style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px">
+    <div style="font-weight:700;margin-bottom:6px">圖片辨識設定（每台裝置設定一次）</div>
+    <label class="note" for="apiKey">Gemini API 金鑰</label>
+    <input id="apiKey" type="password" autocomplete="off" placeholder="貼上金鑰"
+      style="width:100%;font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px;margin:4px 0 8px">
+    <label class="note" for="model">模型</label>
+    <input id="model" type="text" autocomplete="off"
+      style="width:100%;font:inherit;border:1px solid var(--line);border-radius:8px;padding:8px;margin:4px 0 8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="primary" id="btnSaveSet">儲存</button>
+      <button id="btnDelKey">刪除這台的金鑰</button>
+    </div>
+    <p class="note">金鑰只存在這台裝置的瀏覽器，不會寫進網頁程式碼。金鑰到 Google AI Studio（aistudio.google.com）申請。</p>
+  </div>
+  <div id="scan" class="note" style="margin:0 0 10px;font-size:15px"></div>
+  <div class="grid" id="grid"></div>
+
+  <h2>轉換結果</h2>
+  <div class="opts">
+    <label><input type="checkbox" id="optTitle" checked> 加標題與日期</label>
+    <label><input type="checkbox" id="optNum"> 加編號</label>
+    <label><input type="checkbox" id="optTotal" checked> 加品項數</label>
+  </div>
+  <textarea id="out" spellcheck="false"></textarea>
+  <p class="note">只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
+</main>
+
+<div class="bar">
+  <button class="primary" id="btnCopy">複製文字</button>
+  <button id="btnLine">用 LINE 分享</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 預設品項：順序比照紙本「清水叫貨表4.0」(左欄由上到下，再右欄)
+// q = 照片上手寫的數量（先帶入，按「全部清空」即可重填）
+const DEFAULT = [
+  ["紅K","件"],["削青","把"],["小青","把"],["迷你青","把"],["薑母","件"],["B薑","件"],["薑芽","斤"],
+  ["薑絲","斤",1],["蒜仁","斤",20],["水蓮","包"],["小玉米","盒"],["皇帝豆","斤"],["毛豆仁","K"],
+  ["毛豆莢","斤"],["敏豆","包"],["荷蘭豆","K",1],["甜豆","K",1],["日本山藥","件"],["茭白筍","斤",30],
+  ["玉米筍","包"],["玉米","包",6],["貝貝南瓜","件"],["菠菜","件",1],["茼蒿","件"],["地瓜葉","件"],
+  ["高麗菜","件"],["香菜","斤"],["芹菜管","K"],
+  ["美白菇","件"],["鴻喜菇","件"],["金針A","支",1],["小杏B","包",10],["小杏C","包",6],["大香菇","支",1],
+  ["小小菇","支"],["青龍椒","包"],["龍鬚菜","件"],["栗子仁","包"],["秋葵","包"],["娃娃菜","件"],
+  ["麻竹筍","件"],["菱角","斤",12],["花生","斤",12],["朝天椒","件"],["大辣椒","件"],["韭菜花","把"],
+  ["芥蘭芽","件",2],["包心白","件",3],["青花椰","件",3],["小黃瓜","件"],["馬鈴薯","件"],["洋蔥","件"],
+  ["白苦瓜","件"],["水果椒","件"],["白蘿蔔","件",3],["節瓜","件"]
+].map(a=>({n:a[0],u:a[1],q:a[2]!=null?String(a[2]):"",flag:!!a[3]}));
+
+const KEY="qingshui-order-v2";
+const store={
+  get(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}},
+  set(v){try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){}}
+};
+let items=(store.get()||{}).items || DEFAULT.map(x=>({...x}));
+let editing=false;
+
+const $=id=>document.getElementById(id);
+const grid=$("grid"), out=$("out");
+
+// 兩欄排法比照紙本：左欄先排完再排右欄
+function paperOrder(list){
+  const half=Math.ceil(list.length/2), r=[];
+  for(let i=0;i<half;i++){ r.push(i); if(i+half<list.length) r.push(i+half); }
+  return r;
+}
+
+function render(){
+  grid.innerHTML="";
+  paperOrder(items).forEach(i=>{
+    const it=items[i], d=document.createElement("div");
+    d.className="item"+(it.q!==""&&!editing?" has":"");
+    if(editing){
+      d.innerHTML='<input class="ename"><input class="eunit"><button class="del" title="刪除">✕</button>';
+      const [en,eu,del]=d.children;
+      en.value=it.n; eu.value=it.u;
+      en.oninput=()=>{it.n=en.value; it.flag=false; save()};
+      eu.oninput=()=>{it.u=eu.value; save()};
+      del.onclick=()=>{items.splice(i,1); save(); render()};
+    }else{
+      d.innerHTML='<span class="name"></span><input class="qty" type="text" inputmode="decimal"><span class="unit"></span>';
+      const [nm,q,u]=d.children;
+      nm.textContent=it.n; if(it.flag){nm.classList.add("flag"); nm.title="照片上看不清楚，請用「編輯品項」改成正確品名";}
+      u.textContent=it.u; q.value=it.q;
+      q.onfocus=()=>q.select();
+      q.oninput=()=>{it.q=q.value.trim(); d.classList.toggle("has",it.q!==""); save(); build()};
+    }
+    grid.appendChild(d);
+  });
+  $("btnEdit").textContent=editing?"完成編輯":"編輯品項";
+  $("btnEdit").classList.toggle("on",editing);
+  $("btnAdd").hidden=$("btnReset").hidden=!editing;
+  build();
+}
+
+function build(){
+  const picked=items.filter(x=>x.q!==""&&x.q!=="0");
+  const lines=[];
+  if($("optTitle").checked){
+    const v=$("date").value, dt=v?(+v.slice(5,7))+"/"+(+v.slice(8,10)):"";
+    lines.push("【清水叫貨】"+dt);
+  }
+  picked.forEach((x,k)=>lines.push(($("optNum").checked?(k+1)+". ":"")+x.n+" "+x.q+x.u));
+  if($("optTotal").checked&&picked.length) lines.push("共 "+picked.length+" 項");
+  out.value=lines.join("\n");
+  $("count").textContent="已填 "+picked.length+" / "+items.length+" 項";
+}
+
+function save(){store.set({items})}
+function toast(t){const e=$("toast");e.textContent=t;e.classList.add("show");setTimeout(()=>e.classList.remove("show"),1600)}
+
+// 兩段式確認（不用瀏覽器彈窗）
+function confirmBtn(btn,label,fn){
+  btn.onclick=()=>{
+    if(btn.dataset.arm){delete btn.dataset.arm;btn.textContent=label;fn();return}
+    btn.dataset.arm=1;btn.textContent="再按一次確認";
+    setTimeout(()=>{if(btn.dataset.arm){delete btn.dataset.arm;btn.textContent=label}},2500);
+  };
+}
+confirmBtn($("btnClear"),"全部清空",()=>{items.forEach(x=>x.q="");save();render();toast("已清空")});
+confirmBtn($("btnReset"),"還原預設品項",()=>{items=DEFAULT.map(x=>({...x,q:""}));save();render();toast("已還原")});
+$("btnEdit").onclick=()=>{editing=!editing;render()};
+$("btnAdd").onclick=()=>{items.push({n:"",u:"件",q:""});save();render();
+  const e=grid.querySelectorAll(".ename");e[e.length-1].focus()};
+["optTitle","optNum","optTotal","date"].forEach(id=>$(id).onchange=build);
+
+$("btnCopy").onclick=async()=>{
+  try{await navigator.clipboard.writeText(out.value);toast("已複製，可貼到 LINE")}
+  catch(e){out.focus();out.select();toast("請長按文字框手動複製")}
+};
+$("btnLine").onclick=()=>{
+  const a=document.createElement("a");
+  a.href="https://line.me/R/share?text="+encodeURIComponent(out.value);
+  a.target="_blank";a.rel="noopener";document.body.appendChild(a);a.click();a.remove();
+};
+
+// ---- 圖片轉數量：上傳叫貨表照片，由 Gemini 辨識手寫數量 ----
+const CFG="qingshui-gemini-cfg", DEFAULT_MODEL="gemini-3.8-flash";
+function cfgGet(){try{return JSON.parse(localStorage.getItem(CFG))||{}}catch(e){return {}}}
+function cfgSet(v){try{localStorage.setItem(CFG,JSON.stringify(v));return true}catch(e){return false}}
+let scanning=false;
+function scanMsg(t,warn){const e=$("scan");e.textContent=t;e.style.color=warn?"var(--warn)":"var(--sub)"}
+function openSet(show){
+  const c=cfgGet();
+  $("apiKey").value=c.key||""; $("model").value=c.model||DEFAULT_MODEL;
+  $("setPanel").hidden=!show;
+}
+$("btnSet").onclick=()=>openSet($("setPanel").hidden);
+$("btnSaveSet").onclick=()=>{
+  const ok=cfgSet({key:$("apiKey").value.trim(),model:$("model").value.trim()||DEFAULT_MODEL});
+  $("setPanel").hidden=true; toast(ok?"已儲存":"這個瀏覽器無法儲存設定");
+};
+$("btnDelKey").onclick=()=>{cfgSet({model:cfgGet().model||DEFAULT_MODEL});openSet(true);toast("已刪除金鑰")};
+
+function toJpegBase64(file){
+  return new Promise((res,rej)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const max=1800, s=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");
+      c.width=Math.round(img.width*s); c.height=Math.round(img.height*s);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL("image/jpeg",0.9).split(",")[1]);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("image"))};
+    img.src=url;
+  });
+}
+$("btnPhoto").onclick=()=>{
+  if(scanning) return;
+  if(!cfgGet().key){openSet(true);scanMsg("請先貼上 Gemini API 金鑰並儲存，再按一次「圖片轉數量」。",true);return}
+  $("file").value=""; $("file").click();
+};
+$("file").onchange=async()=>{
+  const f=$("file").files[0]; if(!f) return;
+  const c=cfgGet();
+  scanning=true; $("btnPhoto").textContent="辨識中…"; scanMsg("辨識中，請稍候…");
+  try{
+    const b64=await toJpegBase64(f);
+    const list=items.map((x,i)=>(i+1)+". "+x.n+"（"+x.u+"）").join("\n");
+    const prompt="這是一張蔬果「叫貨表」的照片，表格每一格是：印刷的品名、手寫的數量、印刷的單位。\n"+
+      "請找出所有有手寫數量的格子，回傳數量。沒有手寫數量的品項不要回傳。\n"+
+      "品項清單（編號. 品名（單位））：\n"+list+"\n\n"+
+      "規則：\n- 只讀手寫的數字，單位是印刷的，不要把單位當成數字。\n"+
+      "- 如果印刷品名被手寫塗改成別的品名，用手寫的品名去對應清單；清單中找不到就放進 other。\n"+
+      "- 數字看不清楚時仍給出最可能的值，並把該品名加進 unsure。\n"+
+      "只輸出 JSON，不要其他文字，格式：\n"+
+      '{"items":[{"id":編號,"q":"數量"}],"other":[{"n":"品名","q":"數量","u":"單位"}],"unsure":["品名"]}';
+    const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+
+      encodeURIComponent(c.model||DEFAULT_MODEL)+":generateContent",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-goog-api-key":c.key},
+      body:JSON.stringify({
+        contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],
+        generationConfig:{responseMimeType:"application/json",temperature:0}
+      })
+    });
+    if(!resp.ok){
+      let detail=""; try{detail=((await resp.json()).error||{}).message||""}catch(e){}
+      const err=new Error(detail); err.status=resp.status; throw err;
+    }
+    const body=await resp.json();
+    const text=(((body.candidates||[])[0]||{}).content||{}).parts||[];
+    const m=text.map(p=>p.text||"").join("").match(/\{[\s\S]*\}/);
+    if(!m) throw new Error("parse");
+    const data=JSON.parse(m[0]);
+    items.forEach(x=>x.q="");
+    let n=0;
+    (data.items||[]).forEach(o=>{
+      const it=items[Number(o.id)-1], q=String(o.q==null?"":o.q).replace(/[^0-9.]/g,"");
+      if(it&&q!==""){it.q=q;n++}
+    });
+    const others=(data.other||[]).filter(o=>o&&o.n).map(o=>String(o.n)+" "+String(o.q||"")+String(o.u||""));
+    const unsure=(data.unsure||[]).map(String);
+    save(); render();
+    let msg="已辨識 "+n+" 項，請對照照片核對後再送出。";
+    if(unsure.length) msg+=" 不確定："+unsure.join("、")+"。";
+    if(others.length) msg+=" 清單沒有的品項（請手動處理）："+others.join("、")+"。";
+    scanMsg(msg,unsure.length||others.length);
+  }catch(e){
+    const s=e&&e.status;
+    let msg="辨識失敗，請重拍清楚一點再試一次。";
+    if(s===400||s===401||s===403) msg="金鑰無效或沒有權限，請到「辨識設定」檢查金鑰。";
+    else if(s===404) msg="找不到模型，請到「辨識設定」檢查模型名稱。";
+    else if(s===429) msg="已達免費額度或次數上限，請稍後再試。";
+    else if(s>=500) msg="Gemini 服務暫時異常，請稍後再試。";
+    else if(!s&&e&&e.message!=="parse"&&e.message!=="image") msg="連線失敗，請檢查網路後再試。";
+    if(s&&e.message) msg+="（"+String(e.message).slice(0,120)+"）";
+    scanMsg(msg,true);
+  }
+  scanning=false; $("btnPhoto").textContent="📷 圖片轉數量";
+};
+
+const now=new Date();
+$("date").value=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+render();
+</script>
+</body>
+</html>
