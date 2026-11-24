@@ -209,6 +209,7 @@ $("btnLine").onclick=()=>{
 
 // ---- 圖片轉數量：上傳叫貨表照片，由 Gemini 辨識手寫數量 ----
 const CFG="qingshui-gemini-cfg", DEFAULT_MODEL="gemini-3.8-flash";
+const FALLBACK_MODELS=["gemini-3.6-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite"];
 function cfgGet(){try{return JSON.parse(localStorage.getItem(CFG))||{}}catch(e){return {}}}
 function cfgSet(v){try{localStorage.setItem(CFG,JSON.stringify(v));return true}catch(e){return false}}
 let scanning=false;
@@ -260,19 +261,32 @@ $("file").onchange=async()=>{
       "- 數字看不清楚時仍給出最可能的值，並把該品名加進 unsure。\n"+
       "只輸出 JSON，不要其他文字，格式：\n"+
       '{"items":[{"id":編號,"q":"數量"}],"other":[{"n":"品名","q":"數量","u":"單位"}],"unsure":["品名"]}';
-    const resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+
-      encodeURIComponent(c.model||DEFAULT_MODEL)+":generateContent",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","x-goog-api-key":c.key},
-      body:JSON.stringify({
-        contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],
-        generationConfig:{responseMimeType:"application/json",temperature:0}
-      })
+    const reqBody=JSON.stringify({
+      contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],
+      generationConfig:{responseMimeType:"application/json",temperature:0}
     });
-    if(!resp.ok){
+    // 模型忙線或額度滿時，自動換備用模型重試
+    const models=[c.model||DEFAULT_MODEL].concat(FALLBACK_MODELS.filter(m=>m!==(c.model||DEFAULT_MODEL)));
+    let resp=null, lastErr=null;
+    for(let i=0;i<models.length;i++){
+      if(i>0) scanMsg("模型忙線中，改用備用模型重試（"+models[i]+"）…");
+      try{
+        resp=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+
+          encodeURIComponent(models[i])+":generateContent",{
+          method:"POST",
+          headers:{"Content-Type":"application/json","x-goog-api-key":c.key},
+          body:reqBody
+        });
+      }catch(e){ lastErr=e; resp=null; break; }
+      if(resp.ok) break;
       let detail=""; try{detail=((await resp.json()).error||{}).message||""}catch(e){}
-      const err=new Error(detail); err.status=resp.status; throw err;
+      lastErr=new Error(detail); lastErr.status=resp.status;
+      const retry=resp.status===429||resp.status===404||resp.status>=500;
+      resp=null;
+      if(!retry) break;
+      await new Promise(r=>setTimeout(r,1200));
     }
+    if(!resp) throw lastErr||new Error("");
     const body=await resp.json();
     const text=(((body.candidates||[])[0]||{}).content||{}).parts||[];
     const m=text.map(p=>p.text||"").join("").match(/\{[\s\S]*\}/);
@@ -297,7 +311,7 @@ $("file").onchange=async()=>{
     if(s===400||s===401||s===403) msg="金鑰無效或沒有權限，請到「辨識設定」檢查金鑰。";
     else if(s===404) msg="找不到模型，請到「辨識設定」檢查模型名稱。";
     else if(s===429) msg="已達免費額度或次數上限，請稍後再試。";
-    else if(s>=500) msg="Gemini 服務暫時異常，請稍後再試。";
+    else if(s>=500) msg="Gemini 所有模型目前都忙線，請過一兩分鐘再試。";
     else if(!s&&e&&e.message!=="parse"&&e.message!=="image") msg="連線失敗，請檢查網路後再試。";
     if(s&&e.message) msg+="（"+String(e.message).slice(0,120)+"）";
     scanMsg(msg,true);
