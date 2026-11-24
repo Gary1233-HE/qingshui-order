@@ -95,7 +95,7 @@
     <label><input type="checkbox" id="optTotal" checked> 加品項數</label>
   </div>
   <textarea id="out" spellcheck="false"></textarea>
-  <p class="note">只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
+  <p class="note">版本 20261125-5。只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
 </main>
 
 <div class="bar">
@@ -109,6 +109,18 @@
 const DEFAULT = [["紅蘿蔔", "件"], ["削青", "把"], ["小青", "把"], ["迷你青", "把"], ["薑母", "件"], ["B薑", "件"], ["薑芽", "斤"], ["薑絲", "斤"], ["蒜仁", "斤"], ["水蓮", "包"], ["小玉米", "盒"], ["皇帝豆", "斤"], ["毛豆仁", "包"], ["毛豆莢", "包"], ["敏豆", "包"], ["荷蘭豆", "件"], ["甜豆", "件"], ["日本山藥", "件"], ["茭白筍", "斤"], ["玉米筍", "包"], ["玉米", "包"], ["貝貝南瓜", "件"], ["菠菜", "件"], ["茼蒿", "件"], ["地瓜葉", "件"], ["高麗菜", "件"], ["香菜", "斤"], ["芹菜管", "K"], ["美白菇", "件"], ["鴻喜菇", "件"], ["金針A", "支"], ["小杏B", "包"], ["小杏C", "包"], ["大香菇", "支"], ["小小菇", "支"], ["青龍椒", "包"], ["龍鬚菜", "件"], ["栗子仁", "包"], ["秋葵", "包"], ["娃娃菜", "件"], ["麻竹筍", "件"], ["菱角", "斤"], ["花生", "斤"], ["朝天椒", "件"], ["大辣椒", "件"], ["韭菜花", "把"], ["芥蘭芽", "件"], ["包心白", "件"], ["青花椰", "件"], ["小黃瓜", "件"], ["馬鈴薯", "件"], ["洋蔥", "件"], ["白苦瓜", "件"], ["水果椒", "件"], ["白蘿蔔", "件"], ["節瓜", "件"]
 ].map(a=>({n:a[0],u:a[1],q:a[2]!=null?String(a[2]):"",flag:!!a[3]}));
 
+const BUILD="20261125-5";
+// 自動更新：每次開啟時檢查線上版本，較新就自動重新載入，避免瀏覽器快取舊版
+(function(){
+  if(!/^https?:/.test(location.protocol)) return;
+  fetch(location.pathname+"?t="+Date.now(),{cache:"no-store"}).then(r=>r.text()).then(t=>{
+    const m=t.match(/const BUILD="([^"]+)"/);
+    if(m&&m[1]!==BUILD){
+      let n=0; try{n=+sessionStorage.getItem("qs-reload")||0; sessionStorage.setItem("qs-reload",n+1)}catch(e){n=9}
+      if(n<2) location.replace(location.pathname+"?t="+Date.now());
+    }else{ try{sessionStorage.removeItem("qs-reload")}catch(e){} }
+  }).catch(()=>{});
+})();
 const KEY="qingshui-order-v3";
 const store={
   get(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}},
