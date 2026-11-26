@@ -57,7 +57,7 @@
     body>#print{display:block!important;color:#000;font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
     #print .ptitle{height:11mm;line-height:11mm;font-size:7mm;font-weight:800;border-bottom:.6mm solid #000;
       display:flex;justify-content:space-between;white-space:nowrap;overflow:hidden}
-    #print .pgrid{display:grid;grid-auto-flow:column;grid-template-columns:1fr 1fr;column-gap:5mm;margin-top:2mm}
+    #print .pgrid{display:grid;grid-auto-flow:column;grid-template-columns:1fr 1fr;column-gap:14mm;margin-top:2mm}
     #print .pcell{display:flex;justify-content:space-between;align-items:center;gap:.3em;white-space:nowrap;
       overflow:hidden;font-weight:800;line-height:1;border-bottom:.25mm solid #999}
     #print .pcell b{font-weight:900}
@@ -108,7 +108,7 @@
     <label><input type="checkbox" id="optTotal" checked> 加品項數</label>
   </div>
   <textarea id="out" spellcheck="false"></textarea>
-  <p class="note">版本 20261126-1。只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
+  <p class="note">版本 20261126-2。只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
 </main>
 
 <div class="bar">
@@ -124,7 +124,7 @@
 const DEFAULT = [["紅蘿蔔", "件"], ["削青", "把"], ["小青", "把"], ["迷你青", "把"], ["薑母", "件"], ["B薑", "件"], ["薑芽", "斤"], ["薑絲", "斤"], ["蒜仁", "斤"], ["水蓮", "包"], ["小玉米", "盒"], ["皇帝豆", "斤"], ["毛豆仁", "包"], ["毛豆莢", "包"], ["敏豆", "包"], ["荷蘭豆", "件"], ["甜豆", "件"], ["日本山藥", "件"], ["茭白筍", "斤"], ["玉米筍", "包"], ["玉米", "包"], ["貝貝南瓜", "件"], ["菠菜", "件"], ["茼蒿", "件"], ["地瓜葉", "件"], ["高麗菜", "件"], ["香菜", "斤"], ["芹菜管", "K"], ["美白菇", "件"], ["鴻喜菇", "件"], ["金針A", "支"], ["小杏B", "包"], ["小杏C", "包"], ["大香菇", "支"], ["小小菇", "支"], ["青龍椒", "包"], ["龍鬚菜", "件"], ["栗子仁", "包"], ["秋葵", "包"], ["娃娃菜", "件"], ["麻竹筍", "件"], ["菱角", "斤"], ["花生", "斤"], ["朝天椒", "件"], ["大辣椒", "件"], ["韭菜花", "把"], ["芥蘭芽", "件"], ["包心白", "件"], ["青花椰", "件"], ["小黃瓜", "件"], ["馬鈴薯", "件"], ["洋蔥", "件"], ["白苦瓜", "件"], ["水果椒", "件"], ["白蘿蔔", "件"], ["節瓜", "件"]
 ].map(a=>({n:a[0],u:a[1],q:a[2]!=null?String(a[2]):"",flag:!!a[3]}));
 
-const BUILD="20261126-1";
+const BUILD="20261126-2";
 // 自動更新：每次開啟時檢查線上版本，較新就自動重新載入，避免瀏覽器快取舊版
 (function(){
   if(!/^https?:/.test(location.protocol)) return;
@@ -344,7 +344,7 @@ function buildPrint(){
   const picked=items.filter(x=>x.q!==""&&x.q!=="0");
   const box=$("print"); box.innerHTML="";
   if(!picked.length) return false;
-  const PAGE_W=148-14, PAGE_H=210-14, TITLE=11+2, GAP=5;   // mm，A5 直式扣掉邊界
+  const PAGE_W=148-14, PAGE_H=210-14, TITLE=11+2, GAP=14;   // mm，A5 直式扣掉邊界
   const rows=Math.ceil(picked.length/2);
   const rowH=(PAGE_H-TITLE-1)/rows;
   const colW=(PAGE_W-GAP)/2;
