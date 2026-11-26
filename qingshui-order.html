@@ -108,23 +108,32 @@
     <label><input type="checkbox" id="optTotal" checked> 加品項數</label>
   </div>
   <textarea id="out" spellcheck="false"></textarea>
-  <p class="note">版本 20261126-3。只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
+  <p class="note">版本 20261126-4。只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
 </main>
 
 <div class="bar">
-  <button class="primary" id="btnCopy">複製文字</button>
+  <button class="primary" id="btnImg">生成圖片</button>
   <button id="btnLine">用 LINE 分享</button>
   <button id="btnPrint">列印 A5</button>
 </div>
 <div class="toast" id="toast"></div>
 <div id="print"></div>
+<div id="imgView" hidden style="position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.82);display:none;flex-direction:column;align-items:center;padding:12px;gap:10px">
+  <div style="color:#fff;font-size:14px">長按圖片可儲存或分享</div>
+  <img id="imgOut" alt="清水叫貨圖片" style="flex:1;min-height:0;max-width:100%;object-fit:contain">
+  <div style="display:flex;gap:8px;width:100%;max-width:520px">
+    <button class="primary" id="btnImgShare" style="flex:1;padding:13px 6px">分享</button>
+    <button id="btnImgSave" style="flex:1;padding:13px 6px">下載</button>
+    <button id="btnImgClose" style="flex:1;padding:13px 6px">關閉</button>
+  </div>
+</div>
 
 <script>
 // 預設品項：順序比照紙本「清水叫貨表4.0」(左欄由上到下，再右欄)
 const DEFAULT = [["紅蘿蔔", "件"], ["削青", "把"], ["小青", "把"], ["迷你青", "把"], ["薑母", "件"], ["B薑", "件"], ["薑芽", "斤"], ["薑絲", "斤"], ["蒜仁", "斤"], ["水蓮", "包"], ["小玉米", "盒"], ["皇帝豆", "斤"], ["毛豆仁", "包"], ["毛豆莢", "包"], ["敏豆", "包"], ["荷蘭豆", "件"], ["甜豆", "件"], ["日本山藥", "件"], ["茭白筍", "斤"], ["玉米筍", "包"], ["玉米", "包"], ["貝貝南瓜", "件"], ["菠菜", "件"], ["茼蒿", "件"], ["地瓜葉", "件"], ["高麗菜", "件"], ["香菜", "斤"], ["芹菜管", "K"], ["美白菇", "件"], ["鴻喜菇", "件"], ["金針A", "支"], ["小杏B", "包"], ["小杏C", "包"], ["大香菇", "支"], ["小小菇", "支"], ["青龍椒", "包"], ["龍鬚菜", "件"], ["栗子仁", "包"], ["秋葵", "包"], ["娃娃菜", "件"], ["麻竹筍", "件"], ["菱角", "斤"], ["花生", "斤"], ["朝天椒", "件"], ["大辣椒", "件"], ["韭菜花", "把"], ["芥蘭芽", "件"], ["包心白", "件"], ["青花椰", "件"], ["小黃瓜", "件"], ["馬鈴薯", "件"], ["洋蔥", "件"], ["白苦瓜", "件"], ["水果椒", "件"], ["白蘿蔔", "件"], ["節瓜", "件"]
 ].map(a=>({n:a[0],u:a[1],q:a[2]!=null?String(a[2]):"",flag:!!a[3]}));
 
-const BUILD="20261126-3";
+const BUILD="20261126-4";
 // 自動更新：每次開啟時檢查線上版本，較新就自動重新載入，避免瀏覽器快取舊版
 (function(){
   if(!/^https?:/.test(location.protocol)) return;
@@ -213,10 +222,6 @@ $("btnAdd").onclick=()=>{items.push({n:"",u:"件",q:""});save();render();
   const e=grid.querySelectorAll(".ename");e[e.length-1].focus()};
 ["optTitle","optNum","optTotal","date"].forEach(id=>$(id).onchange=build);
 
-$("btnCopy").onclick=async()=>{
-  try{await navigator.clipboard.writeText(out.value);toast("已複製，可貼到 LINE")}
-  catch(e){out.focus();out.select();toast("請長按文字框手動複製")}
-};
 $("btnLine").onclick=()=>{
   const a=document.createElement("a");
   a.href="https://line.me/R/share?text="+encodeURIComponent(out.value);
@@ -370,6 +375,66 @@ function buildPrint(){
 $("btnPrint").onclick=()=>{
   if(!buildPrint()){toast("還沒有填數量的品項");return}
   window.print();
+};
+
+// ---- 生成圖片：A5 比例、兩排、字級自動放到最大 ----
+const FONT='"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif';
+let imgBlob=null, imgUrl=null;
+function drawImage(){
+  const picked=items.filter(x=>x.q!==""&&x.q!=="0");
+  if(!picked.length) return null;
+  const S=12;                                   // 每 mm 幾個像素（A5 = 1776×2520）
+  const W=148*S, H=210*S, PAD=7*S, GAP=24*S, TITLE=11*S;
+  const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+  const g=cv.getContext("2d");
+  g.fillStyle="#fff"; g.fillRect(0,0,W,H); g.fillStyle="#000"; g.textBaseline="middle";
+  const v=$("date").value, dt=v?(+v.slice(5,7))+"/"+(+v.slice(8,10)):"";
+  g.font="800 "+(7*S)+"px "+FONT;
+  g.textAlign="left";  g.fillText("清水叫貨 "+dt,PAD,PAD+TITLE/2);
+  g.textAlign="right"; g.fillText("共 "+picked.length+" 項",W-PAD,PAD+TITLE/2);
+  g.fillRect(PAD,PAD+TITLE,W-2*PAD,0.6*S);
+  const top=PAD+TITLE+2*S, rows=Math.ceil(picked.length/2);
+  const rowH=(H-PAD-top)/rows, colW=(W-2*PAD-GAP)/2;
+  // 用實際量測的文字寬度決定最大字級
+  const BASE=100; let widest=1;
+  picked.forEach(x=>{
+    g.font="800 "+BASE+"px "+FONT; const a=g.measureText(x.n).width;
+    g.font="900 "+BASE+"px "+FONT; const b=g.measureText(x.q+x.u).width;
+    widest=Math.max(widest,a+b+BASE*0.35);
+  });
+  const fs=Math.max(20,Math.min(rowH*0.8, BASE*colW/widest, 30*S));
+  picked.forEach((x,i)=>{
+    const col=i<rows?0:1, r=i<rows?i:i-rows;
+    const x0=PAD+col*(colW+GAP), cy=top+r*rowH+rowH/2;
+    g.fillStyle="#000";
+    g.font="800 "+fs+"px "+FONT; g.textAlign="left";  g.fillText(x.n,x0,cy);
+    g.font="900 "+fs+"px "+FONT; g.textAlign="right"; g.fillText(x.q+x.u,x0+colW,cy);
+    g.fillStyle="#999"; g.fillRect(x0,top+(r+1)*rowH-0.25*S,colW,0.25*S);
+  });
+  return cv;
+}
+function imgName(){const v=$("date").value||"";return "清水叫貨_"+v.replace(/-/g,"")+".png"}
+$("btnImg").onclick=()=>{
+  const cv=drawImage();
+  if(!cv){toast("還沒有填數量的品項");return}
+  cv.toBlob(b=>{
+    if(!b){toast("圖片產生失敗");return}
+    imgBlob=b; if(imgUrl) URL.revokeObjectURL(imgUrl);
+    imgUrl=URL.createObjectURL(b); $("imgOut").src=imgUrl;
+    let canShare=false;
+    try{canShare=!!(navigator.canShare&&navigator.canShare({files:[new File([b],imgName(),{type:"image/png"})]}))}catch(e){}
+    $("btnImgShare").hidden=!canShare;
+    const v=$("imgView"); v.hidden=false; v.style.display="flex";
+  },"image/png");
+};
+$("btnImgClose").onclick=()=>{const v=$("imgView"); v.hidden=true; v.style.display="none"};
+$("btnImgSave").onclick=()=>{
+  const a=document.createElement("a"); a.href=imgUrl; a.download=imgName();
+  document.body.appendChild(a); a.click(); a.remove();
+};
+$("btnImgShare").onclick=async()=>{
+  try{await navigator.share({files:[new File([imgBlob],imgName(),{type:"image/png"})]})}
+  catch(e){ if(e&&e.name!=="AbortError") toast("無法分享，請長按圖片儲存") }
 };
 
 const now=new Date();
