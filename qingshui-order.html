@@ -44,11 +44,24 @@
   .opts{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--sub);margin:6px 0}
   .bar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
     padding:10px 12px;display:flex;gap:8px;justify-content:center;z-index:6}
-  .bar button{flex:1;max-width:260px;padding:13px}
+  .bar button{flex:1;max-width:260px;padding:13px 6px;white-space:nowrap}
   .toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:#fff;
     padding:9px 16px;border-radius:20px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
   .toast.show{opacity:1}
   .note{font-size:13px;color:var(--sub);margin-top:8px}
+  #print{display:none}
+  @page{size:A5 portrait;margin:7mm}
+  @media print{
+    html,body{background:#fff!important;padding:0!important;margin:0!important}
+    body>*{display:none!important}
+    body>#print{display:block!important;color:#000;font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif}
+    #print .ptitle{height:11mm;line-height:11mm;font-size:7mm;font-weight:800;border-bottom:.6mm solid #000;
+      display:flex;justify-content:space-between;white-space:nowrap;overflow:hidden}
+    #print .pgrid{display:grid;grid-auto-flow:column;grid-template-columns:1fr 1fr;column-gap:5mm;margin-top:2mm}
+    #print .pcell{display:flex;justify-content:space-between;align-items:center;gap:.3em;white-space:nowrap;
+      overflow:hidden;font-weight:800;line-height:1;border-bottom:.25mm solid #999}
+    #print .pcell b{font-weight:900}
+  }
 </style>
 </head>
 <body>
@@ -95,21 +108,23 @@
     <label><input type="checkbox" id="optTotal" checked> 加品項數</label>
   </div>
   <textarea id="out" spellcheck="false"></textarea>
-  <p class="note">版本 20261125-5。只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
+  <p class="note">版本 20261126-1。只會列出有填數量的品項；文字框內容可直接再修改。資料只存在這台裝置的瀏覽器。</p>
 </main>
 
 <div class="bar">
   <button class="primary" id="btnCopy">複製文字</button>
   <button id="btnLine">用 LINE 分享</button>
+  <button id="btnPrint">列印 A5</button>
 </div>
 <div class="toast" id="toast"></div>
+<div id="print"></div>
 
 <script>
 // 預設品項：順序比照紙本「清水叫貨表4.0」(左欄由上到下，再右欄)
 const DEFAULT = [["紅蘿蔔", "件"], ["削青", "把"], ["小青", "把"], ["迷你青", "把"], ["薑母", "件"], ["B薑", "件"], ["薑芽", "斤"], ["薑絲", "斤"], ["蒜仁", "斤"], ["水蓮", "包"], ["小玉米", "盒"], ["皇帝豆", "斤"], ["毛豆仁", "包"], ["毛豆莢", "包"], ["敏豆", "包"], ["荷蘭豆", "件"], ["甜豆", "件"], ["日本山藥", "件"], ["茭白筍", "斤"], ["玉米筍", "包"], ["玉米", "包"], ["貝貝南瓜", "件"], ["菠菜", "件"], ["茼蒿", "件"], ["地瓜葉", "件"], ["高麗菜", "件"], ["香菜", "斤"], ["芹菜管", "K"], ["美白菇", "件"], ["鴻喜菇", "件"], ["金針A", "支"], ["小杏B", "包"], ["小杏C", "包"], ["大香菇", "支"], ["小小菇", "支"], ["青龍椒", "包"], ["龍鬚菜", "件"], ["栗子仁", "包"], ["秋葵", "包"], ["娃娃菜", "件"], ["麻竹筍", "件"], ["菱角", "斤"], ["花生", "斤"], ["朝天椒", "件"], ["大辣椒", "件"], ["韭菜花", "把"], ["芥蘭芽", "件"], ["包心白", "件"], ["青花椰", "件"], ["小黃瓜", "件"], ["馬鈴薯", "件"], ["洋蔥", "件"], ["白苦瓜", "件"], ["水果椒", "件"], ["白蘿蔔", "件"], ["節瓜", "件"]
 ].map(a=>({n:a[0],u:a[1],q:a[2]!=null?String(a[2]):"",flag:!!a[3]}));
 
-const BUILD="20261125-5";
+const BUILD="20261126-1";
 // 自動更新：每次開啟時檢查線上版本，較新就自動重新載入，避免瀏覽器快取舊版
 (function(){
   if(!/^https?:/.test(location.protocol)) return;
@@ -321,6 +336,40 @@ $("file").onchange=async()=>{
     scanMsg(msg,true);
   }
   scanning=false; $("btnPhoto").textContent="📷 圖片轉數量";
+};
+
+// ---- 列印 A5：有填數量的品項分兩排，字級自動放到最大 ----
+function textEm(t){let w=0;for(const ch of String(t)) w+=/[\u0000-\u00ff]/.test(ch)?0.62:1;return w}
+function buildPrint(){
+  const picked=items.filter(x=>x.q!==""&&x.q!=="0");
+  const box=$("print"); box.innerHTML="";
+  if(!picked.length) return false;
+  const PAGE_W=148-14, PAGE_H=210-14, TITLE=11+2, GAP=5;   // mm，A5 直式扣掉邊界
+  const rows=Math.ceil(picked.length/2);
+  const rowH=(PAGE_H-TITLE-1)/rows;
+  const colW=(PAGE_W-GAP)/2;
+  const widest=Math.max(...picked.map(x=>textEm(x.n)+textEm(x.q+x.u)+0.5));
+  const font=Math.max(3,Math.min(rowH*0.8, colW/widest, 30));   // 高度、寬度兩個限制取小的
+  const v=$("date").value, dt=v?(+v.slice(5,7))+"/"+(+v.slice(8,10)):"";
+  const t=document.createElement("div"); t.className="ptitle";
+  const t1=document.createElement("span"); t1.textContent="清水叫貨 "+dt;
+  const t2=document.createElement("span"); t2.textContent="共 "+picked.length+" 項";
+  t.append(t1,t2);
+  const g=document.createElement("div"); g.className="pgrid";
+  g.style.gridTemplateRows="repeat("+rows+","+rowH.toFixed(2)+"mm)";
+  g.style.fontSize=font.toFixed(2)+"mm";
+  picked.forEach(x=>{
+    const c=document.createElement("div"); c.className="pcell";
+    const a=document.createElement("span"); a.textContent=x.n;
+    const b=document.createElement("b"); b.textContent=x.q+x.u;
+    c.append(a,b); g.appendChild(c);
+  });
+  box.append(t,g);
+  return true;
+}
+$("btnPrint").onclick=()=>{
+  if(!buildPrint()){toast("還沒有填數量的品項");return}
+  window.print();
 };
 
 const now=new Date();
